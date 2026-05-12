@@ -30,6 +30,8 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":external-guard"))
+    implementation(project(":notification-monitor"))
+    implementation(project(":safety-ime"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
