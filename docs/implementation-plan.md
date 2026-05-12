@@ -75,71 +75,70 @@ local-ai ←── (safety-ime, notification-monitor, media-checker) ※ファ�
 
 ## 4. フェーズ分割
 
-### Phase 0: 基盤 (本セッションで完了予定)
+### Phase 0: 基盤 ✅ (commit e517732)
 
 - [x] git 初期化 + .gitignore
 - [x] 仕様書 / 計画書ドキュメント
-- [ ] Gradle multi-module 雛形 (settings/build/wrapper/libs.versions.toml)
-- [ ] 各モジュールの空シェル (build.gradle.kts + AndroidManifest.xml + パッケージディレクトリ)
-- [ ] app モジュール (MainActivity, RadarApplication, テーマ)
+- [x] Gradle multi-module 雛形 (settings/build/wrapper/libs.versions.toml)
+- [x] 各モジュールの空シェル (build.gradle.kts + AndroidManifest.xml + パッケージディレクトリ)
+- [x] app モジュール (MainActivity, RadarApplication, テーマ)
 
 完了条件: Android Studio で開いて Gradle Sync が通る状態。
 
-### Phase 1: Core MVP
+### Phase 1: Core MVP ✅ (commit f9c0349)
 
-- 管理者 PIN: EncryptedSharedPreferences で保存、設定・検証
-- 設定管理: 監視対象アプリ、検知感度
-- ログDB (Room): エンティティ `DetectionLog`, DAO, 保持期間別の自動削除
-- リスク判定エンジン: ルールベース判定 → スコアリング (仕様 7-8 章)
-- 危険カテゴリ辞書: 仕様 7.1〜7.6 のキーワードリスト
+- [x] 管理者 PIN: EncryptedSharedPreferences + PBKDF2-HMAC-SHA256, 定数時間比較
+- [x] 設定管理: Sensitivity 列挙 + 監視対象アプリ Set
+- [x] ログDB (Room): `DetectionLog` + DAO + Repository + 保持期間別の削除
+- [x] リスク判定エンジン: ルールベース判定、カテゴリ上限 + 組み合わせボーナス
+- [x] 危険カテゴリ辞書: §7.1〜§7.6 のキーワード weight 付き
+- [x] CoreServices ServiceLocator + Radar 単一エントリ
+- [x] 12 ユニットテスト (リスクエンジン 11 + リテンション 1)
 
-完了条件: ユニットテストで「会う約束 + 秘密化」が高スコア化されること。
+### Phase 2: Notification Monitor ✅ (commit d36e351)
 
-### Phase 2: Notification Monitor
+- [x] `NotificationListenerService` (RadarNotificationListenerService)
+- [x] NotificationProcessor (Android 非依存・テスト可能)
+- [x] 監視対象アプリのフィルタ (lambda 注入で疎結合)
+- [x] NotificationListenerPermission (有効化状態 + 設定 Intent)
+- [x] 4 ユニットテスト
 
-- `NotificationListenerService` の実装
-- `core` のリスクエンジンへ通知本文を渡す
-- 高リスクイベントを `DetectionLog` へ書き込み
-- 監視対象アプリのフィルタ
-- 通知監視権限の解除検知 (権限再起動時に検出)
+### Phase 3: Safety IME ✅ (commit f9be709)
 
-完了条件: 開発機の LINE/SMS 通知で `DetectionLog` にエントリが入ること。
+MVP は「チェック専用 IME」として実装 (仕様 §12 の「完全強制ではない」方針)。
 
-### Phase 3: Safety IME
+- [x] InputMethodService (SafetyImeService) + Compose 不使用の軽量パネル
+- [x] PreSendChecker (Android 非依存) + WarningLevel
+- [x] SafetyImePermission
+- [x] manifest 登録 + xml/method.xml
+- [x] 4 ユニットテスト
 
-- `InputMethodService` 派生のスケルトン (シンプルな日本語入力は OS の IME を使わせない方針上、最低限のキーパッドを Compose で実装する)
-- 入力前検査: 確定タイミングで現在の文字列をリスクエンジンへ
-- 子ども側警告ダイアログ (仕様 10 章)
-- 高リスク時のみ最小限抜粋を `DetectionLog` に保存
+将来: フル日本語 IME 対応は Phase 7+ で検討。
 
-注: 日本語IMEとしての完成度は MVP では追わない。プロダクション化は別フェーズ。
+### Phase 4: External Guard ✅ (commit ad9b80e)
 
-完了条件: 設定アプリで Safety IME を有効化でき、危険語句入力で警告ダイアログが出ること。
+- [x] ChecklistDefinitions: §6 の 21 項目を安定 ID で保持
+- [x] ChecklistStateStore (SharedPreferences 実装) + Repository
+- [x] 進捗集計 (Progress)
+- [x] 10 ユニットテスト
 
-### Phase 4: External Guard
+### Phase 5: Parent Console ✅ (commit b4ce03a)
 
-- 仕様 6 章のチェックリストを定義データとして保持
-- 親コンソールから表示・確認状態を保存
-- TONE / Family Link / MDM 等の文言は等位扱い (依存しない)
+- [x] PIN セットアップ / ゲート (Compose Material3)
+- [x] ホーム (権限状態カード × 通知監視 / Safety IME / ログ件数 / チェック進捗)
+- [x] ログ一覧 (スコア色分け + 確認済マーキング + 全削除)
+- [x] 設定 (Sensitivity FilterChip + 監視対象アプリ Switch)
+- [x] External Guard チェックリスト画面 (カテゴリ別 + 進捗バー)
+- [x] Bottom NavigationBar + Lock ボタン
 
-完了条件: 親コンソールでチェックリスト全項目を確認・更新できること。
-
-### Phase 5: Parent Console
-
-- PIN 入力画面
-- ホーム (権限状態 / IME 状態 / 通知監視状態のサマリ)
-- ログ一覧 (フィルタ: 日付・カテゴリ・リスクスコア)
-- 設定 (監視対象アプリ、検知感度)
-- External Guard チェックリスト画面
-- ログ削除・エクスポート (CSV か JSON)
-
-完了条件: PIN を知らない子どもは Parent Console に入れないこと。
+未着手 (後回し): ログ CSV/JSON エクスポート、オンボーディングウィザード。
 
 ### Phase 6: 統合と権限再診断
 
-- 起動時に必要権限の有無を診断
-- 通知監視/IME が無効化された場合の検知ロジック
-- インストール直後のオンボーディングフロー (仕様 14.1)
+- [x] PermissionStateMonitor: 通知監視 / IME の取り消し検知 → SYSTEM ログ
+- [x] Application 起動時の診断 (リテンション適用も)
+- [x] Parent Console の権限再診断ボタンと連動
+- [ ] インストール直後のオンボーディングフロー (仕様 14.1) — Phase 7 に持ち越し
 
 ### Phase 7 以降 (MVP 後回し)
 

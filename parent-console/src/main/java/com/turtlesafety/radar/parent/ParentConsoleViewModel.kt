@@ -11,6 +11,7 @@ import com.turtlesafety.radar.guard.ChecklistCategory
 import com.turtlesafety.radar.guard.ChecklistRepository
 import com.turtlesafety.radar.notif.NotificationListenerPermission
 import com.turtlesafety.radar.ime.SafetyImePermission
+import com.turtlesafety.radar.parent.system.PermissionStateMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,10 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
 
     private val services = Radar.services()
     private val checklistRepo = ChecklistRepository.create(application)
+    private val permissionMonitor = PermissionStateMonitor(
+        context = application,
+        repository = services.detectionLogRepository,
+    )
 
     private val _state = MutableStateFlow(ParentConsoleState())
     val state: StateFlow<ParentConsoleState> = _state.asStateFlow()
@@ -100,12 +105,16 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
     // -----------------------------------------------------------------------
 
     fun refreshPermissions(context: Context) {
-        _state.update {
-            it.copy(
-                notificationListenerEnabled = NotificationListenerPermission.isRadarListenerGranted(context),
-                safetyImeEnabled = SafetyImePermission.isEnabled(context),
-                safetyImeIsDefault = SafetyImePermission.isDefault(context),
-            )
+        viewModelScope.launch {
+            // 直近の保存状態と比較して、無効化があれば SYSTEM ログを残す。
+            permissionMonitor.snapshotAndReport()
+            _state.update {
+                it.copy(
+                    notificationListenerEnabled = NotificationListenerPermission.isRadarListenerGranted(context),
+                    safetyImeEnabled = SafetyImePermission.isEnabled(context),
+                    safetyImeIsDefault = SafetyImePermission.isDefault(context),
+                )
+            }
         }
     }
 

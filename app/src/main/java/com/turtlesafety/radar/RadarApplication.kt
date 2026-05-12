@@ -2,6 +2,7 @@ package com.turtlesafety.radar
 
 import android.app.Application
 import com.turtlesafety.radar.core.Radar
+import com.turtlesafety.radar.parent.system.PermissionStateMonitor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +19,16 @@ class RadarApplication : Application() {
         // 起動時にログのリテンションを一度適用 (仕様書 §11.3)。
         applicationScope.launch {
             runCatching { Radar.services().retentionEnforcer.enforce() }
+        }
+
+        // 起動時に権限状態を診断 — 前回からの取り消しがあれば SYSTEM ログに残す (§9)。
+        applicationScope.launch {
+            runCatching {
+                PermissionStateMonitor(
+                    context = this@RadarApplication,
+                    repository = Radar.services().detectionLogRepository,
+                ).snapshotAndReport()
+            }
         }
     }
 }
