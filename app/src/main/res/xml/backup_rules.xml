@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+        Backup disabled at the manifest level (android:allowBackup="false").
+        Keep this file as a placeholder for the backup configuration if it is enabled later.
+    -->
+</full-backup-content>

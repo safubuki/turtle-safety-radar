@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Stylised radar arc over a turtle silhouette. Replace with a real asset in a later phase. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 C40,28 28,40 28,54 C28,68 40,80 54,80 C68,80 80,68 80,54 C80,40 68,28 54,28 Z M54,36 C64,36 72,44 72,54 C72,64 64,72 54,72 C44,72 36,64 36,54 C36,44 44,36 54,36 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,44 L58,44 L58,52 L66,52 L66,60 L42,60 L42,52 L50,52 Z" />
+</vector>
