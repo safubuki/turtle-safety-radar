@@ -51,8 +51,11 @@ TONEモバイル、Google Family Link、MDM、端末標準のペアレンタル�
 単一APK内に以下のモジュールを持つ。
 
 ```text
-app/
+apps/
+  app/
+platform/
   core/
+features/
   notification-monitor/
   safety-ime/
   media-checker/

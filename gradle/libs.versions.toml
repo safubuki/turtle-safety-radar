@@ -10,6 +10,8 @@ composeCompiler = "1.5.11"
 room = "2.6.1"
 security = "1.1.0-alpha06"
 coroutines = "1.8.0"
+mlkitBarcode = "17.3.0"
+mlkitTextJapanese = "16.0.0"
 junit = "4.13.2"
 androidxJunit = "1.1.5"
 androidxTest = "1.5.0"
@@ -35,6 +37,9 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutines" }
+mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+mlkit-text-recognition-japanese = { group = "com.google.mlkit", name = "text-recognition-japanese", version.ref = "mlkitTextJapanese" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTest" }

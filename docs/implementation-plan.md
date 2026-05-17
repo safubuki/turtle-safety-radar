@@ -38,14 +38,17 @@ turtle-safety-radar/
 ├── docs/
 │   ├── spec-v0.4.md
 │   └── implementation-plan.md  ← 本書
-├── app/                        (com.turtlesafety.radar — エントリAPK)
-├── core/                       (リスク判定エンジン, ログDB, PIN, 設定)
-├── notification-monitor/       (NotificationListenerService)
-├── safety-ime/                 (InputMethodService)
-├── media-checker/              (QR/SNS ID 検査)
-├── local-ai/                   (将来用ファサード、初期はno-op)
-├── parent-console/             (保護者向け Compose 画面群)
-└── external-guard/             (外部制限チェックリスト)
+├── apps/
+│   └── app/                    (com.turtlesafety.radar — エントリAPK)
+├── platform/
+│   └── core/                   (リスク判定エンジン, ログDB, PIN, 設定)
+└── features/
+	├── notification-monitor/   (NotificationListenerService)
+	├── safety-ime/             (InputMethodService)
+	├── media-checker/          (QR/SNS ID 検査)
+	├── local-ai/               (将来用ファサード、初期はno-op)
+	├── parent-console/         (保護者向け Compose 画面群)
+	└── external-guard/         (外部制限チェックリスト)
 ```
 
 ### モジュール依存方針
