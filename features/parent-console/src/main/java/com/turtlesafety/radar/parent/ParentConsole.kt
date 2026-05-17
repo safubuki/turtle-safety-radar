@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -24,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.turtlesafety.radar.parent.screens.ChecklistScreen
 import com.turtlesafety.radar.parent.screens.HomeScreen
 import com.turtlesafety.radar.parent.screens.LogListScreen
 import com.turtlesafety.radar.parent.screens.PinGateScreen
@@ -87,12 +85,6 @@ private fun AuthenticatedScaffold(
                     label = { Text("ログ") },
                 )
                 NavigationBarItem(
-                    selected = state.currentScreen == Screen.Checklist,
-                    onClick = { vm.navigate(Screen.Checklist) },
-                    icon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
-                    label = { Text("チェック") },
-                )
-                NavigationBarItem(
                     selected = state.currentScreen == Screen.Settings,
                     onClick = { vm.navigate(Screen.Settings) },
                     icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
@@ -106,7 +98,6 @@ private fun AuthenticatedScaffold(
                 Screen.Home -> HomeScreen(state = state, vm = vm)
                 Screen.Logs -> LogListScreen(state = state, vm = vm)
                 Screen.Settings -> SettingsScreen(state = state, vm = vm)
-                Screen.Checklist -> ChecklistScreen(state = state, vm = vm)
             }
         }
     }

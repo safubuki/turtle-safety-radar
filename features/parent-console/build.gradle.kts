@@ -29,11 +29,11 @@ android {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":external-guard"))
     implementation(project(":notification-monitor"))
     implementation(project(":safety-ime"))
     implementation(project(":media-checker"))
     implementation(project(":local-ai"))
+    implementation(project(":text-watcher"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

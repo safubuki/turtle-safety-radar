@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.turtlesafety.radar.ai.LocalAiModeDescriptions
 import com.turtlesafety.radar.parent.ParentConsoleState
 import com.turtlesafety.radar.parent.ParentConsoleViewModel
 import com.turtlesafety.radar.parent.components.StatusCard
@@ -91,7 +90,11 @@ fun HomeScreen(
         }
 
         SetupProgressCard(state = state)
-        QuickStartCard()
+        SelfTestCard(
+            state = state,
+            onRun = { vm.runSelfTest() },
+            onClear = { vm.clearSelfTest() },
+        )
         QuickCheckCard(
             text = quickCheckText,
             onTextChange = { quickCheckText = it },
@@ -104,6 +107,17 @@ fun HomeScreen(
         )
 
         StatusCard(
+            title = "入力監視 (Accessibility)",
+            state = if (state.accessibilityEnabled)
+                "子どもがどのキーボードを使っても入力テキストをリスク判定中"
+            else
+                "ユーザー補助サービスから「Turtle Safety Radar 入力監視」を有効にしてください",
+            ok = state.accessibilityEnabled,
+            actionLabel = "ユーザー補助設定を開く",
+            onAction = { vm.openAccessibilitySettings(context) },
+        )
+
+        StatusCard(
             title = "通知監視",
             state = if (state.notificationListenerEnabled)
                 "通知本文をリスク判定中"
@@ -112,21 +126,6 @@ fun HomeScreen(
             ok = state.notificationListenerEnabled,
             actionLabel = "通知アクセス設定を開く",
             onAction = { vm.openNotificationListenerSettings(context) },
-        )
-
-        StatusCard(
-            title = "Safety IME",
-            state = when {
-                state.safetyImeIsDefault -> "デフォルト入力方式に設定済み"
-                state.safetyImeEnabled -> "有効化済み (デフォルト未設定)"
-                else -> "入力方式として有効にしてください"
-            },
-            ok = state.safetyImeEnabled,
-            actionLabel = if (state.safetyImeEnabled) "入力方式ピッカーを表示" else "入力方式設定を開く",
-            onAction = {
-                if (state.safetyImeEnabled) vm.showImePicker(context)
-                else vm.openImeSettings(context)
-            },
         )
 
         StatusCard(
@@ -149,6 +148,21 @@ fun HomeScreen(
             },
         )
 
+        StatusCard(
+            title = "Safety IME (動作確認用)",
+            state = when {
+                state.safetyImeIsDefault -> "デフォルト入力方式: 子どもには非推奨"
+                state.safetyImeEnabled -> "有効化済み (動作確認用)"
+                else -> "未有効。動作確認したい場合のみ有効化してください"
+            },
+            ok = state.safetyImeEnabled,
+            actionLabel = if (state.safetyImeEnabled) "入力方式ピッカーを表示" else "入力方式設定を開く",
+            onAction = {
+                if (state.safetyImeEnabled) vm.showImePicker(context)
+                else vm.openImeSettings(context)
+            },
+        )
+
         Card(colors = CardDefaults.cardColors()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -157,7 +171,7 @@ fun HomeScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = if (state.mediaCheckerEnabled) "画像検査を利用できます" else "画像検査は無効です",
+                    text = if (state.mediaCheckerEnabled) "新規スクリーンショットを自動検査" else "画像検査は無効です",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 state.lastMediaScanResult?.let {
@@ -166,24 +180,6 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Local AI",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = LocalAiModeDescriptions.describe(state.localAiMode).title,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = LocalAiModeDescriptions.describe(state.localAiMode).note,
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
 
@@ -203,36 +199,21 @@ fun HomeScreen(
                 )
             }
         }
-
-        Card(colors = CardDefaults.cardColors()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "External Guard チェックリスト",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "${state.checklistCheckedCount} / ${state.checklistTotal} 項目を確認済",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
     }
 }
 
 @Composable
 private fun SetupProgressCard(state: ParentConsoleState) {
     val completedSteps = listOf(
+        state.accessibilityEnabled,
         state.notificationListenerEnabled,
-        state.safetyImeEnabled,
         state.parentNotificationsEnabled,
     ).count { it }
     val totalSteps = 3
     val nextAction = when {
-        !state.notificationListenerEnabled -> "1. 通知アクセスを許可してください"
-        !state.safetyImeEnabled -> "2. Safety IME を有効化してください"
+        !state.accessibilityEnabled -> "1. 入力監視 (Accessibility) を有効にしてください"
+        !state.notificationListenerEnabled -> "2. 通知アクセスを許可してください"
         !state.parentNotificationsEnabled -> "3. 保護者通知を許可してください"
-        !state.safetyImeIsDefault -> "補足: Safety IME を標準入力方式に設定すると使いやすくなります"
         else -> "初期設定は完了しています"
     }
 
@@ -262,33 +243,39 @@ private fun SetupProgressCard(state: ParentConsoleState) {
 }
 
 @Composable
-private fun QuickStartCard() {
+private fun SelfTestCard(
+    state: ParentConsoleState,
+    onRun: () -> Unit,
+    onClear: () -> Unit,
+) {
     Card(colors = CardDefaults.cardColors()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "このアプリで今できること",
+                text = "セルフテスト",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "1. 通知を監視して危険な兆候を記録します",
+                text = "リスク判定エンジン・ログDB・設定・PIN保存が動作しているかを実機で確認します。\n結果はログ一覧にも 1 件挿入されます。",
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text(
-                text = "2. 下のテスト欄で、その場で文章の危険度を確認できます",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = "3. Safety IME は通常キーボードではなく、送信前チェック専用です",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = "4. Media Checker は設定画面から画像を選んで試せます",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onRun) {
+                    Text("セルフテスト実行")
+                }
+                TextButton(onClick = onClear) {
+                    Text("結果をクリア")
+                }
+            }
+            state.selfTestReport?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }
@@ -307,12 +294,12 @@ private fun QuickCheckCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "その場で試す",
+                text = "その場で文章を判定する",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "まず通常キーボードで文章を入力してください。Safety IME は文字入力ではなく、入力後のチェックに使います。",
+                text = "ルールエンジンの動作確認に使えます。実運用では子どもの入力を Accessibility 経由で自動検知します。",
                 style = MaterialTheme.typography.bodySmall,
             )
             OutlinedTextField(

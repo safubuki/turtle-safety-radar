@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.turtlesafety.radar.guard"
+    namespace = "com.turtlesafety.radar.watcher"
     compileSdk = 34
 
     defaultConfig {
@@ -26,4 +26,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

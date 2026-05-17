@@ -10,8 +10,6 @@ import com.turtlesafety.radar.core.risk.DetectionSource
 import com.turtlesafety.radar.core.settings.LocalAiMode
 import com.turtlesafety.radar.core.security.PinManager
 import com.turtlesafety.radar.core.settings.Sensitivity
-import com.turtlesafety.radar.guard.ChecklistCategory
-import com.turtlesafety.radar.guard.ChecklistRepository
 import com.turtlesafety.radar.media.MediaChecker
 import com.turtlesafety.radar.notif.NotificationListenerPermission
 import com.turtlesafety.radar.ime.SafetyImePermission
@@ -26,7 +24,6 @@ import kotlinx.coroutines.launch
 class ParentConsoleViewModel(application: Application) : AndroidViewModel(application) {
 
     private val services = Radar.services()
-    private val checklistRepo = ChecklistRepository.create(application)
     private val permissionMonitor = PermissionStateMonitor(
         context = application,
         repository = services.detectionLogRepository,
@@ -52,8 +49,6 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
                 monitoredApps = services.settingsStore.monitoredApps,
                 mediaCheckerEnabled = services.settingsStore.mediaCheckerEnabled,
                 localAiMode = services.settingsStore.localAiMode,
-                checklistTotal = checklistRepo.progress().total,
-                checklistCheckedCount = checklistRepo.progress().checked,
             )
         }
         viewModelScope.launch {
@@ -72,16 +67,31 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
             _state.update { it.copy(gateError = "PIN は ${PinManager.MIN_LENGTH} 文字以上で入力してください") }
             return
         }
-        services.pinManager.setPin(pin)
-        _state.update { it.copy(gateStatus = GateStatus.UNLOCKED, gateError = null) }
+        runCatching { services.pinManager.setPin(pin) }
+            .onSuccess {
+                _state.update { it.copy(gateStatus = GateStatus.UNLOCKED, gateError = null) }
+            }
+            .onFailure { t ->
+                _state.update {
+                    it.copy(gateError = "PIN の保存に失敗しました: ${t.message ?: t::class.java.simpleName}")
+                }
+            }
     }
 
     fun verifyPin(pin: String) {
-        if (services.pinManager.verifyPin(pin)) {
-            _state.update { it.copy(gateStatus = GateStatus.UNLOCKED, gateError = null) }
-        } else {
-            _state.update { it.copy(gateError = "PIN が違います") }
-        }
+        runCatching { services.pinManager.verifyPin(pin) }
+            .onSuccess { ok ->
+                if (ok) {
+                    _state.update { it.copy(gateStatus = GateStatus.UNLOCKED, gateError = null) }
+                } else {
+                    _state.update { it.copy(gateError = "PIN が違います") }
+                }
+            }
+            .onFailure { t ->
+                _state.update {
+                    it.copy(gateError = "PIN の検証に失敗しました: ${t.message ?: t::class.java.simpleName}")
+                }
+            }
     }
 
     fun lock() {
@@ -103,28 +113,6 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
     fun setSensitivity(sensitivity: Sensitivity) {
         services.settingsStore.sensitivity = sensitivity
         _state.update { it.copy(sensitivity = sensitivity) }
-    }
-
-    fun toggleMonitored(packageName: String) {
-        val current = services.settingsStore.monitoredApps
-        val updated = if (packageName in current) current - packageName else current + packageName
-        services.settingsStore.monitoredApps = updated
-        _state.update { it.copy(monitoredApps = updated) }
-    }
-
-    fun addMonitoredApp(packageName: String) {
-        val normalized = packageName.trim()
-        if (normalized.isBlank()) return
-
-        val updated = services.settingsStore.monitoredApps + normalized
-        services.settingsStore.monitoredApps = updated
-        _state.update { it.copy(monitoredApps = updated) }
-    }
-
-    fun removeMonitoredApp(packageName: String) {
-        val updated = services.settingsStore.monitoredApps - packageName
-        services.settingsStore.monitoredApps = updated
-        _state.update { it.copy(monitoredApps = updated) }
     }
 
     fun setMediaCheckerEnabled(enabled: Boolean) {
@@ -166,6 +154,63 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
         }
+    }
+
+    fun runSelfTest() {
+        viewModelScope.launch {
+            val report = StringBuilder()
+            // 1. Risk engine sanity check
+            runCatching {
+                val a = services.riskEngine.assess(
+                    text = "親には内緒でLINE教えて",
+                    source = DetectionSource.IME,
+                    appName = null,
+                )
+                report.append("リスク判定: OK (score=${a.score}, カテゴリ=${a.categories.size}件)\n")
+            }.onFailure {
+                report.append("リスク判定: 失敗 - ${it.message}\n")
+            }
+            // 2. DB write/read sanity check
+            runCatching {
+                val a = services.riskEngine.assess(
+                    text = "[診断テスト] このログはセルフテストで作成されました",
+                    source = DetectionSource.IME,
+                    appName = null,
+                )
+                val id = services.detectionLogRepository.record(
+                    assessment = a.copy(
+                        score = 1,
+                        reason = "セルフテスト: DB 書き込み確認",
+                    ),
+                    source = DetectionSource.IME,
+                    appName = "self-test",
+                )
+                val total = services.detectionLogRepository.count()
+                report.append("ログDB書き込み: OK (id=$id, 総件数=$total)\n")
+            }.onFailure {
+                report.append("ログDB書き込み: 失敗 - ${it.message}\n")
+            }
+            // 3. Settings store sanity check
+            runCatching {
+                val s = services.settingsStore.sensitivity
+                val apps = services.settingsStore.monitoredApps.size
+                report.append("設定読込: OK (感度=${s.name}, 対象アプリ=${apps}件)\n")
+            }.onFailure {
+                report.append("設定読込: 失敗 - ${it.message}\n")
+            }
+            // 4. PinManager state
+            runCatching {
+                val set = services.pinManager.isPinSet()
+                report.append("PIN保存: ${if (set) "OK (設定済み)" else "未設定"}\n")
+            }.onFailure {
+                report.append("PIN保存: 失敗 - ${it.message}\n")
+            }
+            _state.update { it.copy(selfTestReport = report.toString().trimEnd()) }
+        }
+    }
+
+    fun clearSelfTest() {
+        _state.update { it.copy(selfTestReport = null) }
     }
 
     fun previewQuickCheck(text: String) {
@@ -216,6 +261,7 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
                     safetyImeEnabled = SafetyImePermission.isEnabled(context),
                     safetyImeIsDefault = SafetyImePermission.isDefault(context),
                     parentNotificationsEnabled = ParentNotificationPermission.isEnabled(context),
+                    accessibilityEnabled = com.turtlesafety.radar.watcher.AccessibilityWatcherPermission.isEnabled(context),
                 )
             }
         }
@@ -233,6 +279,9 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
     fun showImePicker(context: Context) =
         SafetyImePermission.showPicker(context)
 
+    fun openAccessibilitySettings(context: Context) =
+        com.turtlesafety.radar.watcher.AccessibilityWatcherPermission.openSettings(context)
+
     // -----------------------------------------------------------------------
     // Logs
     // -----------------------------------------------------------------------
@@ -245,24 +294,5 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
 
     fun acknowledge(id: Long) {
         viewModelScope.launch { services.detectionLogRepository.acknowledge(id) }
-    }
-
-    // -----------------------------------------------------------------------
-    // Checklist
-    // -----------------------------------------------------------------------
-
-    fun checklistSnapshot(): Map<ChecklistCategory, List<ChecklistRepository.ChecklistEntry>> =
-        checklistRepo.snapshot()
-
-    fun setChecklistItem(id: String, checked: Boolean) {
-        checklistRepo.setChecked(id, checked)
-        val progress = checklistRepo.progress()
-        _state.update {
-            it.copy(
-                checklistRevision = it.checklistRevision + 1,
-                checklistCheckedCount = progress.checked,
-                checklistTotal = progress.total,
-            )
-        }
     }
 }

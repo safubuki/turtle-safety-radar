@@ -2,7 +2,9 @@ package com.turtlesafety.radar.ime
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -27,8 +29,9 @@ import com.turtlesafety.radar.core.Radar
  */
 class SafetyImeService : InputMethodService() {
 
-    private lateinit var preSendChecker: PreSendChecker
-    private lateinit var services: com.turtlesafety.radar.core.CoreServices
+    private var preSendChecker: PreSendChecker? = null
+    private var services: com.turtlesafety.radar.core.CoreServices? = null
+    private var initErrorMessage: String? = null
 
     private var banner: TextView? = null
     private var status: TextView? = null
@@ -36,11 +39,19 @@ class SafetyImeService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
-        services = Radar.services()
-        preSendChecker = PreSendChecker(
-            riskEngine = services.riskEngine,
-            repository = services.detectionLogRepository,
-        )
+        try {
+            val s = Radar.services()
+            services = s
+            preSendChecker = PreSendChecker(
+                riskEngine = s.riskEngine,
+                repository = s.detectionLogRepository,
+            )
+        } catch (t: Throwable) {
+            // Radar.init() が失敗していても IME 自体は起動できるようフォールバック。
+            // ログだけ残し、パネルにはエラーを表示する。
+            Log.e(TAG, "Safety IME init failed", t)
+            initErrorMessage = t.message ?: t::class.java.simpleName
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -48,56 +59,90 @@ class SafetyImeService : InputMethodService() {
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
-            setBackgroundColor(Color.parseColor("#FAFAFA"))
-            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+            // 白背景アプリ上でも認識しやすい淡い色。
+            setBackgroundColor(Color.parseColor("#E8F5E9"))
+            // 高さ 0 で透明に見えないよう最低高さを与える。
+            minimumHeight = dp(260)
         }
 
         banner = TextView(ctx).apply {
-            text = "Turtle Safety Radar"
+            text = if (initErrorMessage == null)
+                "Turtle Safety Radar"
+            else
+                "初期化に失敗: $initErrorMessage"
             textSize = 16f
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#2E7D32"))
+            setBackgroundColor(
+                if (initErrorMessage == null) Color.parseColor("#2E7D32") else Color.parseColor("#C62828")
+            )
             gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
         }
         root.addView(banner)
 
         status = TextView(ctx).apply {
             text = "これは文字入力キーボードではなく、送信前のチェック専用パネルです。"
             textSize = 14f
-            setPadding(dp(4), dp(12), dp(4), dp(12))
-            setTextColor(Color.parseColor("#333333"))
+            setPadding(dp(4), dp(12), dp(4), dp(8))
+            setTextColor(Color.parseColor("#1B5E20"))
+            setTypeface(typeface, Typeface.BOLD)
         }
         root.addView(status)
 
         detail = TextView(ctx).apply {
-            text = "通常キーボードで入力したあとに切り替えて使ってください。パスワードや認証コード欄は検査対象外です。"
+            text =
+                "通常キーボード (Gboard など) で入力したあとに切り替えて使ってください。\n" +
+                    "パスワードや認証コード欄は検査対象外です。"
             textSize = 13f
             setPadding(dp(4), dp(0), dp(4), dp(12))
-            setTextColor(Color.parseColor("#555555"))
+            setTextColor(Color.parseColor("#333333"))
         }
         root.addView(detail)
 
         val checkButton = Button(ctx).apply {
-            text = "リスクチェック"
+            text = "現在のテキストをリスクチェック"
             setOnClickListener { onCheckClicked() }
         }
         root.addView(checkButton)
 
         val pickerButton = Button(ctx).apply {
-            text = "別の入力方式に切り替え"
+            text = "別のキーボードに切り替える"
             setOnClickListener {
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
-                        as android.view.inputmethod.InputMethodManager
-                imm.showInputMethodPicker()
+                try {
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                            as android.view.inputmethod.InputMethodManager
+                    imm.showInputMethodPicker()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to open IME picker", t)
+                }
             }
         }
         root.addView(pickerButton)
 
+        val footer = TextView(ctx).apply {
+            text = "文字入力ができない場合は、上の「別のキーボードに切り替える」から元のキーボードに戻してください。"
+            textSize = 12f
+            setPadding(dp(4), dp(12), dp(4), dp(0))
+            setTextColor(Color.parseColor("#555555"))
+        }
+        root.addView(footer)
+
+        // LinearLayout の LayoutParams は親に追加されるとき置き換わるため、
+        // root 自体には設定不要。MATCH_PARENT/WRAP_CONTENT は使わない。
         return root
     }
 
     private fun onCheckClicked() {
+        val checker = preSendChecker
+        if (checker == null) {
+            updateBanner(
+                level = PreSendChecker.WarningLevel.NONE,
+                message = "初期化エラーのためチェックできません",
+                details = initErrorMessage ?: "アプリを起動し直してください",
+            )
+            return
+        }
         val inputType = currentInputEditorInfo?.inputType ?: 0
         if (ImeFieldSafety.shouldSkipInspection(inputType)) {
             updateBanner(
@@ -126,7 +171,7 @@ class SafetyImeService : InputMethodService() {
             )
             return
         }
-        val result = preSendChecker.check(combined)
+        val result = checker.check(combined)
         updateBanner(
             level = result.level,
             message = null,
@@ -159,7 +204,10 @@ class SafetyImeService : InputMethodService() {
         }
         banner?.text = text
         banner?.setBackgroundColor(Color.parseColor(bgColor))
-        status?.text = "チェック専用IME | 感度: ${services.settingsStore.sensitivity.name} | AI: ${services.settingsStore.localAiMode.name} | 警告レベル: ${level.name}"
+        val statusLine = services?.let {
+            "チェック専用IME | 感度: ${it.settingsStore.sensitivity.name} | AI: ${it.settingsStore.localAiMode.name} | 警告レベル: ${level.name}"
+        } ?: "チェック専用IME (初期化エラー) | 警告レベル: ${level.name}"
+        status?.text = statusLine
         detail?.text = details
     }
 
@@ -174,7 +222,7 @@ class SafetyImeService : InputMethodService() {
                 details = if (skipInspection)
                     "パスワードや認証コードは取得・保存しません。"
                 else
-                    "通常キーボードで入力後に「リスクチェック」を押してください。文字入力そのものは行えません。",
+                    "通常キーボードで入力後に「現在のテキストをリスクチェック」を押してください。文字入力そのものは行えません。",
             )
         }
     }
@@ -183,8 +231,9 @@ class SafetyImeService : InputMethodService() {
         (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        private const val TAG = "SafetyImeService"
+
         /** リスク判定に渡す前後文字数。子どもの全文取得を避けるため上限を設ける。 */
         private const val MAX_PROBE_CHARS = 200
     }
 }
-

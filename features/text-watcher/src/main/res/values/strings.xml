@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_label">Turtle Safety Radar 入力監視</string>
+    <string name="accessibility_service_description">子どもがどのキーボードで入力しても、危険な文章を端末内で検知して保護者に通知します。本文は保存されません(高リスク時のみ最小限の抜粋)。</string>
+</resources>

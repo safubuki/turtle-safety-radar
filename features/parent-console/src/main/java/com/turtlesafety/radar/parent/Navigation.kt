@@ -5,7 +5,6 @@ sealed interface Screen {
     data object Home : Screen
     data object Logs : Screen
     data object Settings : Screen
-    data object Checklist : Screen
 }
 
 /** PIN 認証ゲートの状態。 */

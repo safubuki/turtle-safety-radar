@@ -62,7 +62,7 @@ dependencies {
     implementation(project(":media-checker"))
     implementation(project(":local-ai"))
     implementation(project(":parent-console"))
-    implementation(project(":external-guard"))
+    implementation(project(":text-watcher"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
