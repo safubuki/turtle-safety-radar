@@ -118,12 +118,16 @@ MVP は「チェック専用 IME」として実装 (仕様 §12 の「完全強�
 
 将来: フル日本語 IME 対応は Phase 7+ で検討。
 
-### Phase 4: External Guard ✅ (commit ad9b80e)
+### Phase 4: External Guard
 
-- [x] ChecklistDefinitions: §6 の 21 項目を安定 ID で保持
-- [x] ChecklistStateStore (SharedPreferences 実装) + Repository
-- [x] 進捗集計 (Progress)
-- [x] 10 ユニットテスト
+- [x] ChecklistDefinitions: §6 の 21 項目を安定 ID で 4 カテゴリで保持
+- [x] ChecklistRepository (SharedPreferences 実装) + 進捗集計
+- [x] ExternalGuardScreen (Compose): カテゴリ別カード + 進捗バー
+- [x] ボトムナビへ「チェック」タブとして組み込み
+- [ ] ユニットテスト (後続フェーズで追加予定)
+
+実装場所: `features/parent-console/.../guard/` および `screens/ExternalGuardScreen.kt`
+(初期実装ではモジュール分割せず parent-console 内に同居)。
 
 ### Phase 5: Parent Console ✅ (commit b4ce03a)
 
@@ -141,13 +145,22 @@ MVP は「チェック専用 IME」として実装 (仕様 §12 の「完全強�
 - [x] PermissionStateMonitor: 通知監視 / IME の取り消し検知 → SYSTEM ログ
 - [x] Application 起動時の診断 (リテンション適用も)
 - [x] Parent Console の権限再診断ボタンと連動
-- [ ] インストール直後のオンボーディングフロー (仕様 14.1) — Phase 7 に持ち越し
+- [x] インストール直後のオンボーディングフロー (仕様 14.1, PIN 設定前にウェルカム + プライバシー方針案内を前置)
 
-### Phase 7 以降 (MVP 後回し)
+### Phase 7: 製品品質向上 (今フェーズ)
 
-- Media Checker (QR/SNS ID画像検査)
+- [x] 保護者コンソール全画面の UI 刷新 (Material 3 アイコン / 視認性向上 / 日本語ラベル統一)
+- [x] ログ画面のリスクレベル日本語表示、ソース別アイコン、フィルタチップ、空状態
+- [x] 設定画面に監視対象アプリの追加 / 削除 UI、データ保持期間表示、プライバシー方針セクション
+- [x] ホーム画面のセルフテスト / Quick Check を「開発者向け診断」セクションに格納
+- [x] クラッシュ画面の家庭ユーザー向け文言調整 (技術詳細は折り畳み)
+
+### Phase 8 以降 (今後の拡張候補)
+
+- Media Checker のさらなる強化 (リアルタイム監視、信頼度調整)
 - Local AI (Level 1 軽量分類器、Level 2 LLM)
 - 親アプリへの Push 通知 (FCM 不使用なら LAN 経由など別途検討)
+- 子ども側警告 UI の強化 (仕様 §10、IME 以外のタイミングでの警告表示)
 - Google Play 公開分割案 (仕様 15 章)
 
 ## 5. リスクと未確定事項

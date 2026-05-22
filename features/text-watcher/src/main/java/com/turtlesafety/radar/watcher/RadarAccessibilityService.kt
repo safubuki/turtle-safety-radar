@@ -1,12 +1,17 @@
 package com.turtlesafety.radar.watcher
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 import com.turtlesafety.radar.core.Radar
 import com.turtlesafety.radar.core.log.DetectionLogRepository
 import com.turtlesafety.radar.core.risk.DetectionSource
+import com.turtlesafety.radar.core.risk.RiskAssessment
+import com.turtlesafety.radar.core.risk.RiskCategory
 import com.turtlesafety.radar.core.risk.RiskEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,11 +30,13 @@ import kotlinx.coroutines.launch
  * - 同一テキストの連続検出はデバウンスで間引く
  * - パスワード/認証コードらしき欄は SkipInspection (input field privacy)
  * - 高リスクのみ最小限ログを保存(全文ログ化はしない)
+ * - スコア >= 4 のとき子ども側へ短いトースト警告 (仕様書 §10)
  */
 class RadarAccessibilityService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var debounceJob: Job? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var riskEngine: RiskEngine? = null
     private var repository: DetectionLogRepository? = null
@@ -38,6 +45,9 @@ class RadarAccessibilityService : AccessibilityService() {
     /** 同一テキストの再判定を防ぐ短期メモリ(プロセスメモリのみ、永続化しない)。 */
     private var lastEvaluatedText: String? = null
     private var lastEvaluatedAt: Long = 0L
+
+    /** 子ども側警告のスロットリング (連打を避ける)。 */
+    private var lastChildWarnAt: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -102,6 +112,45 @@ class RadarAccessibilityService : AccessibilityService() {
                     )
                 }
             }
+
+            // 仕様書 §10: 子どもへ警告を表示する。
+            // 高リスクのみ、かつ短時間に連発しないよう一定間隔で抑制する。
+            if (assessment.score >= MIN_CHILD_WARN_SCORE) {
+                val warnNow = System.currentTimeMillis()
+                if (warnNow - lastChildWarnAt >= CHILD_WARN_SUPPRESS_MS) {
+                    lastChildWarnAt = warnNow
+                    showChildWarning(assessment)
+                }
+            }
+        }
+    }
+
+    private fun showChildWarning(assessment: RiskAssessment) {
+        val message = childWarningMessageFor(assessment)
+        mainHandler.post {
+            runCatching {
+                Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun childWarningMessageFor(assessment: RiskAssessment): String {
+        val categories = assessment.categories
+        // 仕様書 §10 の例文に沿ったメッセージを優先カテゴリで選ぶ。
+        return when {
+            RiskCategory.SEXUAL_REQUEST in categories ->
+                "写真や自撮りを送る前に保護者に相談してください"
+            RiskCategory.COERCION in categories ->
+                "脅されていると感じたらすぐに家族に相談してください"
+            RiskCategory.MEETUP in categories ->
+                "知らない人と会う約束は危険です。家族に相談してください"
+            RiskCategory.CONTACT_EXCHANGE in categories ->
+                "知らない人に連絡先や QR / ID を送るのは危険です"
+            RiskCategory.SECRECY in categories ->
+                "親に内緒のやり取りに注意。不安なときは家族に相談を"
+            RiskCategory.IDENTITY_UNKNOWN in categories ->
+                "相手のことが分からない時は連絡先を渡さないでください"
+            else -> "今のやり取りには注意が必要です。家族に相談してください"
         }
     }
 
@@ -128,6 +177,12 @@ class RadarAccessibilityService : AccessibilityService() {
 
         /** ログ保存閾値(仕様書 §11: 高リスクのみ最小限ログ)。 */
         private const val MIN_LOG_SCORE = 3
+
+        /** 子ども側警告の発火閾値 (仕様書 §10: 高リスク相当)。 */
+        private const val MIN_CHILD_WARN_SCORE = 4
+
+        /** 子ども側警告のスロットリング (連打防止)。 */
+        private const val CHILD_WARN_SUPPRESS_MS = 30_000L
     }
 }
 
