@@ -13,6 +13,7 @@ import com.turtlesafety.radar.core.settings.Sensitivity
 import com.turtlesafety.radar.media.MediaChecker
 import com.turtlesafety.radar.notif.NotificationListenerPermission
 import com.turtlesafety.radar.ime.SafetyImePermission
+import com.turtlesafety.radar.parent.guard.ChecklistRepository
 import com.turtlesafety.radar.parent.system.ParentNotificationPermission
 import com.turtlesafety.radar.parent.system.PermissionStateMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
         riskEngine = services.riskEngine,
         repository = services.detectionLogRepository,
     )
+    private val checklistRepository = ChecklistRepository(application)
 
     private val _state = MutableStateFlow(ParentConsoleState())
     val state: StateFlow<ParentConsoleState> = _state.asStateFlow()
@@ -49,13 +51,51 @@ class ParentConsoleViewModel(application: Application) : AndroidViewModel(applic
                 monitoredApps = services.settingsStore.monitoredApps,
                 mediaCheckerEnabled = services.settingsStore.mediaCheckerEnabled,
                 localAiMode = services.settingsStore.localAiMode,
+                checklistState = checklistRepository.snapshot(),
+                checklistProgress = checklistRepository.progress(),
             )
         }
         viewModelScope.launch {
             services.detectionLogRepository.observeRecent(limit = 200).collect { logs ->
-                _state.update { it.copy(recentLogs = logs, totalLogCount = logs.size) }
+                _state.update {
+                    it.copy(
+                        recentLogs = logs,
+                        totalLogCount = logs.size,
+                        unacknowledgedLogCount = logs.count { log -> !log.acknowledged },
+                    )
+                }
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // External Guard checklist (仕様書 §6 / §17.5)
+    // -----------------------------------------------------------------------
+
+    fun setChecklistItem(itemId: String, value: Boolean) {
+        checklistRepository.setChecked(itemId, value)
+        _state.update {
+            it.copy(
+                checklistState = checklistRepository.snapshot(),
+                checklistProgress = checklistRepository.progress(),
+            )
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Monitored apps (仕様書 §5.6)
+    // -----------------------------------------------------------------------
+
+    fun addMonitoredApp(packageName: String) {
+        val normalized = packageName.trim()
+        if (normalized.isEmpty()) return
+        services.settingsStore.addMonitoredApp(normalized)
+        _state.update { it.copy(monitoredApps = services.settingsStore.monitoredApps) }
+    }
+
+    fun removeMonitoredApp(packageName: String) {
+        services.settingsStore.removeMonitoredApp(packageName)
+        _state.update { it.copy(monitoredApps = services.settingsStore.monitoredApps) }
     }
 
     // -----------------------------------------------------------------------

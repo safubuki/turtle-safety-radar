@@ -5,6 +5,7 @@ import com.turtlesafety.radar.core.risk.RiskAssessment
 import com.turtlesafety.radar.core.settings.LocalAiMode
 import com.turtlesafety.radar.core.settings.Sensitivity
 import com.turtlesafety.radar.media.MediaScanResult
+import com.turtlesafety.radar.parent.guard.ChecklistRepository
 
 /** Parent Console の表示状態。ViewModel が `StateFlow` で提供する。 */
 data class ParentConsoleState(
@@ -15,6 +16,7 @@ data class ParentConsoleState(
 
     val recentLogs: List<DetectionLog> = emptyList(),
     val totalLogCount: Int = 0,
+    val unacknowledgedLogCount: Int = 0,
 
     val sensitivity: Sensitivity = Sensitivity.NORMAL,
     val monitoredApps: Set<String> = emptySet(),
@@ -34,4 +36,9 @@ data class ParentConsoleState(
     val quickCheckError: String? = null,
 
     val selfTestReport: String? = null,
+
+    /** External Guard チェック項目: id -> 確認済み。 */
+    val checklistState: Map<String, Boolean> = emptyMap(),
+    val checklistProgress: ChecklistRepository.Progress =
+        ChecklistRepository.Progress(done = 0, total = 0),
 )

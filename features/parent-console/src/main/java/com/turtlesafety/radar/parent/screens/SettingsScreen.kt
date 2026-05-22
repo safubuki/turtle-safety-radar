@@ -5,22 +5,44 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.turtlesafety.radar.ai.LocalAiModeDescriptions
@@ -29,6 +51,7 @@ import com.turtlesafety.radar.core.settings.Sensitivity
 import com.turtlesafety.radar.media.MediaScanResult
 import com.turtlesafety.radar.parent.ParentConsoleState
 import com.turtlesafety.radar.parent.ParentConsoleViewModel
+import com.turtlesafety.radar.parent.format.RiskLabels
 
 @Composable
 fun SettingsScreen(
@@ -44,80 +67,66 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "設定",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-
-        SensitivitySection(state = state, onSet = vm::setSensitivity)
-        MediaCheckerSection(
-            state = state,
-            onToggle = vm::setMediaCheckerEnabled,
-            onAnalyze = { imagePicker.launch("image/*") },
-        )
-        LocalAiSection(
-            currentMode = state.localAiMode,
-            onSet = vm::setLocalAiMode,
-        )
-    }
-}
-
-@Composable
-private fun SensitivitySection(state: ParentConsoleState, onSet: (Sensitivity) -> Unit) {
-    Card(colors = CardDefaults.cardColors()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "検知感度", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        SectionCard(title = "検知感度", icon = Icons.Outlined.Tune) {
             Text(
-                text = "リスクスコアにこのオフセットを加算します。",
+                text = "リスクスコアに加算されるオフセットを変えます。誤検知が多ければ「低」、見逃しが気になるなら「高」を選んでください。",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Sensitivity.entries.forEach { s ->
                     FilterChip(
                         selected = state.sensitivity == s,
-                        onClick = { onSet(s) },
+                        onClick = { vm.setSensitivity(s) },
                         label = { Text(text = s.label()) },
                     )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun MediaCheckerSection(
-    state: ParentConsoleState,
-    onToggle: (Boolean) -> Unit,
-    onAnalyze: () -> Unit,
-) {
-    Card(colors = CardDefaults.cardColors()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionCard(title = "監視対象アプリ", icon = Icons.Outlined.Apps) {
+            Text(
+                text = "通知本文の検査対象とするアプリを管理します。初期値は LINE / Gmail / Messages / Discord / Instagram / X / TikTok です。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            MonitoredAppsEditor(
+                packages = state.monitoredApps,
+                onAdd = vm::addMonitoredApp,
+                onRemove = vm::removeMonitoredApp,
+            )
+        }
+
+        SectionCard(title = "画像チェッカー", icon = Icons.Outlined.Image) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Media Checker",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = "新規スクリーンショットを自動検査",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "新しいスクリーンショットを自動検査します。手動検査でも試せます。",
+                        text = "OFF にすると手動検査のみになります。",
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(checked = state.mediaCheckerEnabled, onCheckedChange = onToggle)
+                Switch(
+                    checked = state.mediaCheckerEnabled,
+                    onCheckedChange = vm::setMediaCheckerEnabled,
+                )
             }
 
             Button(
                 enabled = state.mediaCheckerEnabled && !state.mediaScanInProgress,
-                onClick = onAnalyze,
+                onClick = { imagePicker.launch("image/*") },
             ) {
                 Text(if (state.mediaScanInProgress) "検査中..." else "画像を選んで手動検査")
             }
@@ -138,6 +147,174 @@ private fun MediaCheckerSection(
                 MediaScanSummary(result)
             }
         }
+
+        SectionCard(title = "Local AI モード", icon = Icons.Outlined.AutoAwesome) {
+            val description = LocalAiModeDescriptions.describe(state.localAiMode)
+            Text(
+                text = description.summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LocalAiMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = state.localAiMode == mode,
+                        onClick = { vm.setLocalAiMode(mode) },
+                        label = { Text(LocalAiModeDescriptions.describe(mode).title) },
+                    )
+                }
+            }
+            Text(
+                text = description.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SectionCard(title = "データ保持", icon = Icons.Outlined.Schedule) {
+            Text(
+                text = "ログの保持期間 (仕様 §11.3 に準拠)",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            RetentionRow("高リスク", "90 日")
+            RetentionRow("中リスク", "30 日")
+            RetentionRow("低リスク", "7 日")
+            Text(
+                text = "起動時に保持期間を超えたログは自動削除されます。手動の全削除は「ログ」画面から行えます。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        SectionCard(title = "プライバシー方針", icon = Icons.Outlined.PrivacyTip) {
+            BulletText("入力全文 / チャット全文は保存しません")
+            BulletText("パスワード・認証コードは検査・保存しません")
+            BulletText("画像そのものは保存しません (検査結果のみ)")
+            BulletText("高リスクのみ最小限の抜粋を端末内ログに残します")
+            BulletText("ログ・設定は端末外に送信しません")
+        }
+
+        Spacer(Modifier.size(8.dp))
+    }
+}
+
+@Composable
+private fun SectionCard(
+    title: String,
+    icon: ImageVector,
+    content: @Composable () -> Unit,
+) {
+    Card(colors = CardDefaults.cardColors()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun MonitoredAppsEditor(
+    packages: Set<String>,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    var newPackage by rememberSaveable { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val sorted = remember(packages) { packages.sorted() }
+        if (sorted.isEmpty()) {
+            Text(
+                text = "監視対象アプリは現在ありません。下のフィールドからパッケージ名を追加してください。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            sorted.forEach { pkg ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = displayNameFor(pkg),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = pkg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { onRemove(pkg) }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "$pkg を監視対象から外す",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                HorizontalDivider()
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = newPackage,
+                onValueChange = { newPackage = it.trim() },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                label = { Text("パッケージ名を追加 (例: com.example.app)") },
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(
+                enabled = newPackage.isNotBlank(),
+                onClick = {
+                    onAdd(newPackage)
+                    newPackage = ""
+                },
+            ) {
+                Icon(imageVector = Icons.Outlined.Add, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("追加")
+            }
+        }
+    }
+}
+
+private fun displayNameFor(packageName: String): String = when (packageName) {
+    "jp.naver.line.android" -> "LINE"
+    "com.google.android.gm" -> "Gmail"
+    "com.google.android.apps.messaging" -> "Google Messages"
+    "com.discord" -> "Discord"
+    "com.instagram.android" -> "Instagram"
+    "com.twitter.android" -> "X (旧 Twitter)"
+    "com.zhiliaoapp.musically" -> "TikTok"
+    else -> packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }
+}
+
+@Composable
+private fun RetentionRow(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text = label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+        Text(text = value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun BulletText(text: String) {
+    Row {
+        Text(text = "・", style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.width(4.dp))
+        Text(text = text, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -150,12 +327,13 @@ private fun MediaScanSummary(result: MediaScanResult) {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "score ${result.score} / source ${result.source.name}",
+            text = "${RiskLabels.levelLabel(result.score)} (スコア ${result.score}) · ${RiskLabels.sourceLabel(result.source)}",
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
             text = result.warningMessage,
             style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (result.signals.isNotEmpty()) {
             Text(
@@ -171,39 +349,9 @@ private fun MediaScanSummary(result: MediaScanResult) {
         }
         result.extractedTextPreview?.let {
             Text(
-                text = "OCR抜粋: $it",
+                text = "OCR 抜粋: $it",
                 style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
-}
-
-@Composable
-private fun LocalAiSection(
-    currentMode: LocalAiMode,
-    onSet: (LocalAiMode) -> Unit,
-) {
-    val description = LocalAiModeDescriptions.describe(currentMode)
-
-    Card(colors = CardDefaults.cardColors()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "Local AI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                text = description.summary,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LocalAiMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = currentMode == mode,
-                        onClick = { onSet(mode) },
-                        label = { Text(LocalAiModeDescriptions.describe(mode).title) },
-                    )
-                }
-            }
-            Text(
-                text = description.note,
-                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

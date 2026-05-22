@@ -85,6 +85,7 @@ private fun CrashScreen(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    var showDetails by remember { mutableStateOf(false) }
     val timestamp = remember(crashAt) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.JAPAN).format(Date(crashAt))
     }
@@ -94,69 +95,81 @@ private fun CrashScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(20.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
-            text = "前回起動時にクラッシュしました",
+            text = "前回の起動時に予期しないエラーが発生しました",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )
-        Text(text = "発生時刻: $timestamp", style = MaterialTheme.typography.bodySmall)
         Text(
-            text = "下のスタックトレースをコピー/共有/保存できます。",
+            text = "アプリは続けて使えます。問題の詳細はサポート用に控えられています。",
             style = MaterialTheme.typography.bodyMedium,
         )
+        Text(text = "発生時刻: $timestamp", style = MaterialTheme.typography.bodySmall)
 
-        Column(
+        Button(
+            onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    copyToClipboard(context, report)
-                    Toast.makeText(context, "クリップボードにコピーしました", Toast.LENGTH_SHORT).show()
-                },
-            ) {
-                Text("クリップボードにコピー")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { shareReport(context, report, crashAt) },
-            ) {
-                Text("共有 (メール / メモ等へ送る)")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    val saved = saveToDownloads(context, report, crashAt)
-                    Toast.makeText(
-                        context,
-                        if (saved != null) "保存しました: $saved" else "保存に失敗しました",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                },
-            ) {
-                Text("Downloads に保存 (テキスト+JSON)")
-            }
-        }
-
-        Card(colors = CardDefaults.cardColors()) {
-            // SelectionContainer により長押し選択 → コピーも可能。
-            SelectionContainer {
-                Text(
-                    modifier = Modifier.padding(12.dp),
-                    text = report,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-        }
-
-        Button(onClick = onDismiss) {
             Text("閉じてアプリを続行")
+        }
+
+        OutlinedButton(
+            onClick = { showDetails = !showDetails },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (showDetails) "詳細を閉じる" else "詳細とサポート向け情報")
+        }
+
+        if (showDetails) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        copyToClipboard(context, report)
+                        Toast.makeText(context, "クリップボードにコピーしました", Toast.LENGTH_SHORT).show()
+                    },
+                ) {
+                    Text("クリップボードにコピー")
+                }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { shareReport(context, report, crashAt) },
+                ) {
+                    Text("共有 (メール / メモ等へ送る)")
+                }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val saved = saveToDownloads(context, report, crashAt)
+                        Toast.makeText(
+                            context,
+                            if (saved != null) "保存しました: $saved" else "保存に失敗しました",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    },
+                ) {
+                    Text("Downloads に保存 (テキスト+JSON)")
+                }
+
+                Card(colors = CardDefaults.cardColors()) {
+                    // SelectionContainer により長押し選択 → コピーも可能。
+                    SelectionContainer {
+                        Text(
+                            modifier = Modifier.padding(12.dp),
+                            text = report,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                }
+            }
         }
     }
 }

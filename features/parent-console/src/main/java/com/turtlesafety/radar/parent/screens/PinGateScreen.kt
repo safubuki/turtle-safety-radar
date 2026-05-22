@@ -1,19 +1,28 @@
 package com.turtlesafety.radar.parent.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,14 +56,30 @@ fun PinGateScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Spacer(Modifier.size(24.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.size(72.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+        }
         Text(
-            text = "Parent Console ロック中",
+            text = "ロック中",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = "管理者 PIN を入力してください。",
+            text = "Parent Console を表示するには管理者 PIN を入力してください。",
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (safetyImeIsDefault) {
@@ -73,7 +98,7 @@ fun PinGateScreen(
                         color = Color(0xFFB71C1C),
                     )
                     Text(
-                        text = "Safety IME は文字入力できないパネルです。Gboard などの通常キーボードをデフォルトに戻してから PIN を入力してください。",
+                        text = "Safety IME は文字入力できないパネルです。通常キーボードに戻してから PIN を入力してください。",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedButton(onClick = { SafetyImePermission.openImeSettings(context) }) {
@@ -94,7 +119,7 @@ fun PinGateScreen(
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             isError = error != null,
-            modifier = Modifier.fillMaxWidth(0.8f),
+            modifier = Modifier.fillMaxWidth(),
         )
 
         error?.let {
@@ -108,8 +133,9 @@ fun PinGateScreen(
         Button(
             enabled = pin.length >= 4,
             onClick = { onSubmit(pin); pin = "" },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Text("解除する")
+            Text("解除する", style = MaterialTheme.typography.titleMedium)
         }
     }
 }
