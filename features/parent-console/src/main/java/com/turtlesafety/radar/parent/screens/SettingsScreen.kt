@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Tune
@@ -45,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import com.turtlesafety.radar.ai.LocalAiModeDescriptions
 import com.turtlesafety.radar.core.settings.LocalAiMode
 import com.turtlesafety.radar.core.settings.Sensitivity
@@ -195,8 +198,74 @@ fun SettingsScreen(
             BulletText("ログ・設定は端末外に送信しません")
         }
 
+        AboutSection()
+
         Spacer(Modifier.size(8.dp))
     }
+}
+
+@Composable
+private fun AboutSection() {
+    val context = LocalContext.current
+    val versionName = remember(context) { resolveVersionName(context) }
+    SectionCard(title = "このアプリについて", icon = Icons.Outlined.Info) {
+        Row {
+            Text(
+                text = "アプリ名",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = "Turtle Safety Radar",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row {
+            Text(
+                text = "バージョン",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = versionName,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Row {
+            Text(
+                text = "対応仕様",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = "v0.4",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Text(
+            text = "家庭内での見守り利用を想定したサイドロード版です。Google Play 配布版とは別の運用ポリシーで動作します。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun resolveVersionName(context: Context): String {
+    val pm = context.packageManager
+    return runCatching {
+        @Suppress("DEPRECATION")
+        val info = pm.getPackageInfo(context.packageName, 0)
+        val name = info.versionName ?: "—"
+        val code = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            @Suppress("DEPRECATION") info.versionCode.toLong()
+        }
+        "$name (${code})"
+    }.getOrDefault("不明")
 }
 
 @Composable
