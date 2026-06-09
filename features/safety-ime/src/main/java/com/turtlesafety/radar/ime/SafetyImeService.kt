@@ -3,6 +3,7 @@ package com.turtlesafety.radar.ime
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.util.Log
 import android.view.Gravity
@@ -58,56 +59,60 @@ class SafetyImeService : InputMethodService() {
         val ctx = this
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            // 白背景アプリ上でも認識しやすい淡い色。
-            setBackgroundColor(Color.parseColor("#E8F5E9"))
-            // 高さ 0 で透明に見えないよう最低高さを与える。
-            minimumHeight = dp(260)
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+            setBackgroundColor(COLOR_BG)
+            minimumHeight = dp(280)
         }
 
         banner = TextView(ctx).apply {
-            text = if (initErrorMessage == null)
-                "Turtle Safety Radar"
-            else
-                "初期化に失敗: $initErrorMessage"
+            text = if (initErrorMessage == null) "Turtle Safety Radar" else "初期化に失敗: $initErrorMessage"
             textSize = 16f
-            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
             setTextColor(Color.WHITE)
-            setBackgroundColor(
-                if (initErrorMessage == null) Color.parseColor("#2E7D32") else Color.parseColor("#C62828")
+            background = roundedDrawable(
+                if (initErrorMessage == null) COLOR_OK else COLOR_STOP,
+                radiusDp = 12,
             )
             gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
         }
-        root.addView(banner)
+        root.addView(banner, marginParams(topDp = 0))
+
+        val title = TextView(ctx).apply {
+            text = "送信前リスクチェック"
+            textSize = 14f
+            setTextColor(COLOR_TITLE)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, dp(14), 0, dp(2))
+        }
+        root.addView(title)
 
         status = TextView(ctx).apply {
-            text = "これは文字入力キーボードではなく、送信前のチェック専用パネルです。"
-            textSize = 14f
-            setPadding(dp(4), dp(12), dp(4), dp(8))
-            setTextColor(Color.parseColor("#1B5E20"))
-            setTypeface(typeface, Typeface.BOLD)
+            text = "このパネルは文字入力できません。通常キーボードで書いたあと、ここでチェックボタンを押してください。"
+            textSize = 13f
+            setPadding(0, 0, 0, dp(2))
+            setTextColor(COLOR_BODY)
         }
         root.addView(status)
 
         detail = TextView(ctx).apply {
-            text =
-                "通常キーボード (Gboard など) で入力したあとに切り替えて使ってください。\n" +
-                    "パスワードや認証コード欄は検査対象外です。"
-            textSize = 13f
-            setPadding(dp(4), dp(0), dp(4), dp(12))
-            setTextColor(Color.parseColor("#333333"))
+            text = "パスワードや認証コード欄は検査対象外です。"
+            textSize = 12f
+            setPadding(0, dp(2), 0, dp(8))
+            setTextColor(COLOR_MUTED)
         }
         root.addView(detail)
 
         val checkButton = Button(ctx).apply {
             text = "現在のテキストをリスクチェック"
+            isAllCaps = false
             setOnClickListener { onCheckClicked() }
         }
-        root.addView(checkButton)
+        root.addView(checkButton, marginParams(topDp = 8))
 
         val pickerButton = Button(ctx).apply {
             text = "別のキーボードに切り替える"
+            isAllCaps = false
             setOnClickListener {
                 try {
                     val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
@@ -118,18 +123,16 @@ class SafetyImeService : InputMethodService() {
                 }
             }
         }
-        root.addView(pickerButton)
+        root.addView(pickerButton, marginParams(topDp = 6))
 
         val footer = TextView(ctx).apply {
-            text = "文字入力ができない場合は、上の「別のキーボードに切り替える」から元のキーボードに戻してください。"
-            textSize = 12f
-            setPadding(dp(4), dp(12), dp(4), dp(0))
-            setTextColor(Color.parseColor("#555555"))
+            text = "文字入力できない場合は、上のボタンで通常キーボードに戻してください。"
+            textSize = 11f
+            setPadding(0, dp(10), 0, 0)
+            setTextColor(COLOR_MUTED)
         }
         root.addView(footer)
 
-        // LinearLayout の LayoutParams は親に追加されるとき置き換わるため、
-        // root 自体には設定不要。MATCH_PARENT/WRAP_CONTENT は使わない。
         return root
     }
 
@@ -181,11 +184,22 @@ class SafetyImeService : InputMethodService() {
 
     private fun buildDetails(result: PreSendChecker.CheckResult): String {
         val categories = result.assessment.categories
-            .joinToString(separator = ", ") { it.name }
+            .joinToString(separator = ", ") { categoryLabel(it) }
             .ifBlank { "カテゴリなし" }
         val excerpt = result.assessment.excerpt ?: "抜粋なし"
         return "カテゴリ: $categories\n抜粋: $excerpt"
     }
+
+    /** 仕様書 §7 の日本語カテゴリ名で表示する。 */
+    private fun categoryLabel(category: com.turtlesafety.radar.core.risk.RiskCategory): String =
+        when (category) {
+            com.turtlesafety.radar.core.risk.RiskCategory.CONTACT_EXCHANGE -> "連絡先交換"
+            com.turtlesafety.radar.core.risk.RiskCategory.SECRECY -> "秘密化"
+            com.turtlesafety.radar.core.risk.RiskCategory.MEETUP -> "会う約束"
+            com.turtlesafety.radar.core.risk.RiskCategory.SEXUAL_REQUEST -> "性的・自撮り要求"
+            com.turtlesafety.radar.core.risk.RiskCategory.COERCION -> "脅し・支配"
+            com.turtlesafety.radar.core.risk.RiskCategory.IDENTITY_UNKNOWN -> "身元不明"
+        }
 
     private fun updateBanner(
         level: PreSendChecker.WarningLevel,
@@ -194,19 +208,25 @@ class SafetyImeService : InputMethodService() {
     ) {
         val (text, bgColor) = when (level) {
             PreSendChecker.WarningLevel.NONE ->
-                (message ?: "問題は見つかりませんでした") to "#2E7D32"
+                (message ?: "問題は見つかりませんでした") to COLOR_OK
             PreSendChecker.WarningLevel.NOTICE ->
-                level.displayMessage to "#F9A825"
+                level.displayMessage to COLOR_NOTICE
             PreSendChecker.WarningLevel.WARN ->
-                level.displayMessage to "#EF6C00"
+                level.displayMessage to COLOR_WARN
             PreSendChecker.WarningLevel.STOP ->
-                level.displayMessage to "#C62828"
+                level.displayMessage to COLOR_STOP
         }
         banner?.text = text
-        banner?.setBackgroundColor(Color.parseColor(bgColor))
+        banner?.background = roundedDrawable(bgColor, radiusDp = 12)
+        val levelLabel = when (level) {
+            PreSendChecker.WarningLevel.NONE -> "問題なし"
+            PreSendChecker.WarningLevel.NOTICE -> "注意"
+            PreSendChecker.WarningLevel.WARN -> "要確認"
+            PreSendChecker.WarningLevel.STOP -> "高リスク"
+        }
         val statusLine = services?.let {
-            "チェック専用IME | 感度: ${it.settingsStore.sensitivity.name} | AI: ${it.settingsStore.localAiMode.name} | 警告レベル: ${level.name}"
-        } ?: "チェック専用IME (初期化エラー) | 警告レベル: ${level.name}"
+            "感度: ${it.settingsStore.sensitivity.name} · AI: ${it.settingsStore.localAiMode.name} · 判定: $levelLabel"
+        } ?: "(初期化エラー) · 判定: $levelLabel"
         status?.text = statusLine
         detail?.text = details
     }
@@ -222,10 +242,22 @@ class SafetyImeService : InputMethodService() {
                 details = if (skipInspection)
                     "パスワードや認証コードは取得・保存しません。"
                 else
-                    "通常キーボードで入力後に「現在のテキストをリスクチェック」を押してください。文字入力そのものは行えません。",
+                    "通常キーボードで入力後に「現在のテキストをリスクチェック」を押してください。",
             )
         }
     }
+
+    private fun marginParams(topDp: Int): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+            topMargin = dp(topDp)
+        }
+
+    private fun roundedDrawable(color: Int, radiusDp: Int): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(color)
+        }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
@@ -235,5 +267,15 @@ class SafetyImeService : InputMethodService() {
 
         /** リスク判定に渡す前後文字数。子どもの全文取得を避けるため上限を設ける。 */
         private const val MAX_PROBE_CHARS = 200
+
+        private val COLOR_BG = Color.parseColor("#F5F8F4")
+        private val COLOR_TITLE = Color.parseColor("#1B5E20")
+        private val COLOR_BODY = Color.parseColor("#212121")
+        private val COLOR_MUTED = Color.parseColor("#616161")
+
+        private val COLOR_OK = Color.parseColor("#2E7D32")
+        private val COLOR_NOTICE = Color.parseColor("#F9A825")
+        private val COLOR_WARN = Color.parseColor("#EF6C00")
+        private val COLOR_STOP = Color.parseColor("#C62828")
     }
 }
